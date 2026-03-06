@@ -34,6 +34,9 @@ import com.miyabi0619.subsonicclient.data.repository.LoginRepository
 @Composable
 fun LibraryScreen(
     loginRepository: LoginRepository,
+    onAlbumClick: (albumId: String) -> Unit = {},
+    onArtistClick: (artistId: String) -> Unit = {},
+    onPlaylistClick: (playlistId: String) -> Unit = {},
     viewModel: LibraryViewModel = viewModel(
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
@@ -85,10 +88,19 @@ fun LibraryScreen(
                     Text(state.error!!, color = MaterialTheme.colorScheme.error)
                 }
                 else -> when (state.selectedTab) {
-                    LibraryTab.Albums -> LibraryAlbumList(albums = state.albums)
-                    LibraryTab.Artists -> LibraryArtistList(artists = state.artists)
+                    LibraryTab.Albums -> LibraryAlbumList(
+                        albums = state.albums,
+                        onAlbumClick = onAlbumClick
+                    )
+                    LibraryTab.Artists -> LibraryArtistList(
+                        artists = state.artists,
+                        onArtistClick = onArtistClick
+                    )
                     LibraryTab.Genres -> LibraryGenreList(genres = state.genres)
-                    LibraryTab.Playlists -> LibraryPlaylistList(playlists = state.playlists)
+                    LibraryTab.Playlists -> LibraryPlaylistList(
+                        playlists = state.playlists,
+                        onPlaylistClick = onPlaylistClick
+                    )
                 }
             }
         }
@@ -96,7 +108,10 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun LibraryAlbumList(albums: List<AlbumDto>) {
+private fun LibraryAlbumList(
+    albums: List<AlbumDto>,
+    onAlbumClick: (albumId: String) -> Unit = {}
+) {
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -105,7 +120,10 @@ private fun LibraryAlbumList(albums: List<AlbumDto>) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { },
+                    .clickable {
+                        val id = album.id ?: return@clickable
+                        onAlbumClick(id)
+                    },
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Text(
@@ -126,14 +144,22 @@ private fun LibraryAlbumList(albums: List<AlbumDto>) {
 }
 
 @Composable
-private fun LibraryArtistList(artists: List<ArtistDto>) {
+private fun LibraryArtistList(
+    artists: List<ArtistDto>,
+    onArtistClick: (artistId: String) -> Unit = {}
+) {
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(artists) { artist ->
             Card(
-                modifier = Modifier.fillMaxWidth().clickable { },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        val id = artist.id ?: return@clickable
+                        onArtistClick(id)
+                    },
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Text(
@@ -173,14 +199,22 @@ private fun LibraryGenreList(genres: List<GenreDto>) {
 }
 
 @Composable
-private fun LibraryPlaylistList(playlists: List<PlaylistDto>) {
+private fun LibraryPlaylistList(
+    playlists: List<PlaylistDto>,
+    onPlaylistClick: (playlistId: String) -> Unit = {}
+) {
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(playlists) { playlist ->
             Card(
-                modifier = Modifier.fillMaxWidth().clickable { },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        val id = playlist.id ?: return@clickable
+                        onPlaylistClick(id)
+                    },
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Text(

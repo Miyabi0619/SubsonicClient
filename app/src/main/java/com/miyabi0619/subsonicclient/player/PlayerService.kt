@@ -15,10 +15,14 @@ import androidx.media3.session.MediaSessionService
 import com.miyabi0619.subsonicclient.R
 import com.miyabi0619.subsonicclient.data.api.SubsonicStreamUrlBuilder
 import com.miyabi0619.subsonicclient.data.prefs.CredentialsStore
+import com.miyabi0619.subsonicclient.eq.EqApplier
+import com.miyabi0619.subsonicclient.eq.EqStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 class PlayerService : MediaSessionService() {
@@ -27,11 +31,14 @@ class PlayerService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private var player: ExoPlayer? = null
     private lateinit var credentialsStore: CredentialsStore
+    private lateinit var eqStore: EqStore
+    private var eqApplier: EqApplier? = null
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
         credentialsStore = CredentialsStore(applicationContext)
+        eqStore = EqStore(applicationContext)
         val exoPlayer = ExoPlayer.Builder(this).build().apply {
             repeatMode = Player.REPEAT_MODE_OFF
             playWhenReady = true
@@ -114,10 +121,26 @@ class PlayerService : MediaSessionService() {
             p.setMediaItems(mediaItems, startIndex, 0L)
             p.prepare()
             p.play()
+            attachEqIfNeeded(p.audioSessionId)
+        }
+    }
+
+    private fun attachEqIfNeeded(audioSessionId: Int) {
+        if (audioSessionId == 0) return
+        eqApplier?.release()
+        val applier = EqApplier(audioSessionId)
+        if (applier.attach()) {
+            serviceScope.launch {
+                eqStore.eqState.first().let { applier.apply(it) }
+            }
+            eqStore.eqState.onEach { applier.apply(it) }.launchIn(serviceScope)
+            eqApplier = applier
         }
     }
 
     override fun onDestroy() {
+        eqApplier?.release()
+        eqApplier = null
         mediaSession?.run {
             player?.release()
             release()

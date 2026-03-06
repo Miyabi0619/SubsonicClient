@@ -2,10 +2,12 @@ package com.miyabi0619.subsonicclient.ui.player
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -17,12 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.miyabi0619.subsonicclient.player.PlaybackState
-import com.miyabi0619.subsonicclient.player.PlayerViewModel
 
 @Composable
 fun PlayerBar(
     playbackState: PlaybackState,
     onPlayPause: () -> Unit,
+    onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (!playbackState.hasController) return
@@ -30,7 +32,7 @@ fun PlayerBar(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { },
+            .clickable(onClick = onClick),
         tonalElevation = 2.dp
     ) {
         Row(
@@ -40,9 +42,7 @@ fun PlayerBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            androidx.compose.foundation.layout.Column(
-                modifier = Modifier.weight(1f)
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = playbackState.currentTitle ?: "—",
                     style = MaterialTheme.typography.bodyMedium,
@@ -54,18 +54,11 @@ fun PlayerBar(
                     maxLines = 1
                 )
             }
-            IconButton(
-                onClick = onPlayPause,
-                modifier = Modifier
-            ) {
-                if (playbackState.isPlaying) {
-                    Text("⏸", style = MaterialTheme.typography.titleLarge)
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "再生"
-                    )
-                }
+            IconButton(onClick = onPlayPause) {
+                Icon(
+                    imageVector = if (playbackState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (playbackState.isPlaying) "一時停止" else "再生"
+                )
             }
         }
     }

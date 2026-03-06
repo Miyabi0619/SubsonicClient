@@ -1,10 +1,14 @@
 package com.miyabi0619.subsonicclient.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,6 +19,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun SettingsScreen(
     onLogout: () -> Unit,
+    onOpenEq: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Scaffold(modifier = modifier) { padding ->
@@ -26,7 +31,16 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.Start
         ) {
-            Text(text = "設定", style = androidx.compose.material3.MaterialTheme.typography.titleLarge)
+            Text(text = "設定", style = MaterialTheme.typography.titleLarge)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpenEq)
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = "イコライザ", style = MaterialTheme.typography.bodyLarge)
+            }
             Button(onClick = onLogout) {
                 Text("ログアウト")
             }

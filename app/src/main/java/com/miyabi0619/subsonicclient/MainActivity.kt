@@ -42,6 +42,11 @@ import com.miyabi0619.subsonicclient.ui.settings.SettingsScreen
 import com.miyabi0619.subsonicclient.ui.theme.SubsonicClientTheme
 import com.miyabi0619.subsonicclient.player.PlayerViewModel
 import com.miyabi0619.subsonicclient.ui.player.PlayerBar
+import com.miyabi0619.subsonicclient.ui.eq.EqScreen
+import com.miyabi0619.subsonicclient.ui.album.AlbumDetailScreen
+import com.miyabi0619.subsonicclient.ui.artist.ArtistDetailScreen
+import com.miyabi0619.subsonicclient.ui.playlist.PlaylistDetailScreen
+import com.miyabi0619.subsonicclient.ui.player.NowPlayingScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -112,7 +117,8 @@ fun MainScreen(
             Column {
                 PlayerBar(
                     playbackState = playbackState,
-                    onPlayPause = { playerViewModel.playPause() }
+                    onPlayPause = { playerViewModel.playPause() },
+                    onClick = { navController.navigate("nowplaying") }
                 )
                 NavigationBar {
                     AppDestinations.entries.forEach { dest ->
@@ -145,20 +151,68 @@ fun MainScreen(
             composable(AppDestinations.Home.route) {
                 HomeScreen(
                     loginRepository = loginRepository,
-                    onPlaySong = onPlaySong
+                    onPlaySong = onPlaySong,
+                    onAlbumClick = { albumId -> navController.navigate("album/$albumId") }
                 )
             }
             composable(AppDestinations.Library.route) {
-                LibraryScreen(loginRepository = loginRepository)
+                LibraryScreen(
+                    loginRepository = loginRepository,
+                    onAlbumClick = { albumId -> navController.navigate("album/$albumId") },
+                    onArtistClick = { artistId -> navController.navigate("artist/$artistId") },
+                    onPlaylistClick = { playlistId -> navController.navigate("playlist/$playlistId") }
+                )
             }
             composable(AppDestinations.Search.route) {
                 SearchScreen(
                     loginRepository = loginRepository,
-                    onPlaySong = onPlaySong
+                    onPlaySong = onPlaySong,
+                    onAlbumClick = { albumId -> navController.navigate("album/$albumId") },
+                    onArtistClick = { artistId -> navController.navigate("artist/$artistId") },
+                    onPlaylistClick = { playlistId -> navController.navigate("playlist/$playlistId") }
                 )
             }
             composable(AppDestinations.Settings.route) {
-                SettingsScreen(onLogout = onLogout)
+                SettingsScreen(
+                    onLogout = onLogout,
+                    onOpenEq = { navController.navigate("eq") }
+                )
+            }
+            composable("eq") {
+                EqScreen(onBack = { navController.popBackStack() })
+            }
+            composable("album/{albumId}") { backStackEntry ->
+                val albumId = backStackEntry.arguments?.getString("albumId") ?: return@composable
+                AlbumDetailScreen(
+                    albumId = albumId,
+                    loginRepository = loginRepository,
+                    onBack = { navController.popBackStack() },
+                    onPlaySong = onPlaySong
+                )
+            }
+            composable("nowplaying") {
+                NowPlayingScreen(
+                    playerViewModel = playerViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable("artist/{artistId}") { backStackEntry ->
+                val artistId = backStackEntry.arguments?.getString("artistId") ?: return@composable
+                ArtistDetailScreen(
+                    artistId = artistId,
+                    loginRepository = loginRepository,
+                    onBack = { navController.popBackStack() },
+                    onAlbumClick = { albumId -> navController.navigate("album/$albumId") }
+                )
+            }
+            composable("playlist/{playlistId}") { backStackEntry ->
+                val playlistId = backStackEntry.arguments?.getString("playlistId") ?: return@composable
+                PlaylistDetailScreen(
+                    playlistId = playlistId,
+                    loginRepository = loginRepository,
+                    onBack = { navController.popBackStack() },
+                    onPlaySong = onPlaySong
+                )
             }
         }
     }

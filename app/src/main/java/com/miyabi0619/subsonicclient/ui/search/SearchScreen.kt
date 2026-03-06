@@ -33,6 +33,9 @@ import com.miyabi0619.subsonicclient.data.repository.LoginRepository
 fun SearchScreen(
     loginRepository: LoginRepository,
     onPlaySong: (songId: String, title: String?, artist: String?, queueIds: List<String>) -> Unit = { _, _, _, _ -> },
+    onAlbumClick: (albumId: String) -> Unit = {},
+    onArtistClick: (artistId: String) -> Unit = {},
+    onPlaylistClick: (playlistId: String) -> Unit = {},
     viewModel: SearchViewModel = viewModel(
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
@@ -108,7 +111,10 @@ fun SearchScreen(
                             )
                         }
                         items(state.albums) { album ->
-                            SearchAlbumItem(album = album)
+                            SearchAlbumItem(
+                                album = album,
+                                onClick = { album.id?.let { onAlbumClick(it) } }
+                            )
                         }
                     }
                     if (state.artists.isNotEmpty()) {
@@ -119,7 +125,10 @@ fun SearchScreen(
                             )
                         }
                         items(state.artists) { artist ->
-                            SearchArtistItem(artist = artist)
+                            SearchArtistItem(
+                                artist = artist,
+                                onClick = { artist.id?.let { onArtistClick(it) } }
+                            )
                         }
                     }
                     if (state.playlists.isNotEmpty()) {
@@ -130,7 +139,10 @@ fun SearchScreen(
                             )
                         }
                         items(state.playlists) { playlist ->
-                            SearchPlaylistItem(playlist = playlist)
+                            SearchPlaylistItem(
+                                playlist = playlist,
+                                onClick = { playlist.id?.let { onPlaylistClick(it) } }
+                            )
                         }
                     }
                 }
@@ -159,9 +171,9 @@ private fun SearchSongItem(song: SongDto, onClick: () -> Unit = {}) {
 }
 
 @Composable
-private fun SearchAlbumItem(album: AlbumDto) {
+private fun SearchAlbumItem(album: AlbumDto, onClick: () -> Unit = {}) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -177,9 +189,9 @@ private fun SearchAlbumItem(album: AlbumDto) {
 }
 
 @Composable
-private fun SearchArtistItem(artist: ArtistDto) {
+private fun SearchArtistItem(artist: ArtistDto, onClick: () -> Unit = {}) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Text(
@@ -191,9 +203,9 @@ private fun SearchArtistItem(artist: ArtistDto) {
 }
 
 @Composable
-private fun SearchPlaylistItem(playlist: PlaylistDto) {
+private fun SearchPlaylistItem(playlist: PlaylistDto, onClick: () -> Unit = {}) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {

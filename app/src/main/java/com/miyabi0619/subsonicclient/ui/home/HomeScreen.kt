@@ -38,6 +38,7 @@ import com.miyabi0619.subsonicclient.data.repository.LoginRepository
 fun HomeScreen(
     loginRepository: LoginRepository,
     onPlaySong: (songId: String, title: String?, artist: String?, queueIds: List<String>) -> Unit = { _, _, _, _ -> },
+    onAlbumClick: (albumId: String) -> Unit = {},
     viewModel: HomeViewModel = viewModel(
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
@@ -87,7 +88,13 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             items(state.recentAlbums) { album ->
-                                AlbumCard(album = album)
+                                AlbumCard(
+                                    album = album,
+                                    onClick = {
+                                        val id = album.id ?: return@AlbumCard
+                                        onAlbumClick(id)
+                                    }
+                                )
                             }
                         }
                     }
@@ -138,9 +145,9 @@ fun HomeScreen(
 }
 
 @Composable
-private fun AlbumCard(album: AlbumDto) {
+private fun AlbumCard(album: AlbumDto, onClick: () -> Unit = {}) {
     Card(
-        modifier = Modifier.size(140.dp),
+        modifier = Modifier.size(140.dp).clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
