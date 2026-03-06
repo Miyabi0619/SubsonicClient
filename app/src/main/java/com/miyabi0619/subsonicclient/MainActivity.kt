@@ -1,9 +1,11 @@
 package com.miyabi0619.subsonicclient
 
+import android.app.Application
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
@@ -38,6 +40,8 @@ import com.miyabi0619.subsonicclient.ui.nav.AppDestinations
 import com.miyabi0619.subsonicclient.ui.search.SearchScreen
 import com.miyabi0619.subsonicclient.ui.settings.SettingsScreen
 import com.miyabi0619.subsonicclient.ui.theme.SubsonicClientTheme
+import com.miyabi0619.subsonicclient.player.PlayerViewModel
+import com.miyabi0619.subsonicclient.ui.player.PlayerBar
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,36 +75,62 @@ fun SubsonicClientApp() {
         LoginScreen(viewModel = loginViewModel)
     } else {
         MainScreen(
+            loginRepository = loginRepository,
             onLogout = { scope.launch { loginRepository.logout() } }
         )
     }
 }
 
 @Composable
-fun MainScreen(onLogout: () -> Unit) {
+fun MainScreen(
+    loginRepository: LoginRepository,
+    onLogout: () -> Unit
+) {
+    val context = LocalContext.current
+    val app = context.applicationContext as Application
+    val playerViewModel: PlayerViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                return PlayerViewModel(app) as T
+            }
+        }
+    )
+    val playbackState by playerViewModel.playbackState.collectAsState()
+
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
+    val onPlaySong: (String, String?, String?, List<String>) -> Unit = { songId, title, artist, queueIds ->
+        playerViewModel.play(songId, queueIds, title, artist)
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
-            NavigationBar {
-                AppDestinations.entries.forEach { dest ->
-                    NavigationBarItem(
-                        icon = { Icon(dest.icon, contentDescription = dest.title) },
-                        label = { Text(dest.title) },
-                        selected = currentDestination?.hierarchy?.any { it.route == dest.route } == true,
-                        onClick = {
-                            navController.navigate(dest.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
+            Column {
+                PlayerBar(
+                    playbackState = playbackState,
+                    onPlayPause = { playerViewModel.playPause() }
+                )
+                NavigationBar {
+                    AppDestinations.entries.forEach { dest ->
+                        NavigationBarItem(
+                            icon = { Icon(dest.icon, contentDescription = dest.title) },
+                            label = { Text(dest.title) },
+                            selected = currentDestination?.hierarchy?.any { it.route == dest.route } == true,
+                            onClick = {
+                                navController.navigate(dest.route) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
                                 }
-                                launchSingleTop = true
-                                restoreState = true
                             }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
@@ -112,9 +142,21 @@ fun MainScreen(onLogout: () -> Unit) {
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            composable(AppDestinations.Home.route) { HomeScreen() }
-            composable(AppDestinations.Library.route) { LibraryScreen() }
-            composable(AppDestinations.Search.route) { SearchScreen() }
+            composable(AppDestinations.Home.route) {
+                HomeScreen(
+                    loginRepository = loginRepository,
+                    onPlaySong = onPlaySong
+                )
+            }
+            composable(AppDestinations.Library.route) {
+                LibraryScreen(loginRepository = loginRepository)
+            }
+            composable(AppDestinations.Search.route) {
+                SearchScreen(
+                    loginRepository = loginRepository,
+                    onPlaySong = onPlaySong
+                )
+            }
             composable(AppDestinations.Settings.route) {
                 SettingsScreen(onLogout = onLogout)
             }

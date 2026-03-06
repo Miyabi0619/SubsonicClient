@@ -79,3 +79,27 @@ object SubsonicStreamUrlBuilder {
         return "${restBase}stream.view?$query"
     }
 }
+
+/**
+ * カバーアート画像用 URL（画像表示・Coil 等に渡す）.
+ */
+object SubsonicCoverArtUrlBuilder {
+
+    fun build(
+        serverUrl: String,
+        username: String,
+        password: String,
+        coverArtId: String?,
+        size: Int? = 300
+    ): String? {
+        if (coverArtId.isNullOrBlank()) return null
+        val restBase = serverUrl.trimEnd('/').let {
+            if (it.endsWith("/rest")) it else if (it.endsWith("/rest/")) it.dropLast(1) else "$it/rest"
+        }.trimEnd('/') + "/"
+        val params = SubsonicAuth.authParams(username, password).toMutableMap()
+        params["id"] = coverArtId
+        size?.let { params["size"] = it.toString() }
+        val query = params.entries.joinToString("&") { (k, v) -> "$k=${java.net.URLEncoder.encode(v, "UTF-8")}" }
+        return "${restBase}getCoverArt.view?$query"
+    }
+}

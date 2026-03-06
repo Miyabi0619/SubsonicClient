@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">SubsonicClient</string>
+    <string name="notification_channel_playback">再生中</string>
 </resources>

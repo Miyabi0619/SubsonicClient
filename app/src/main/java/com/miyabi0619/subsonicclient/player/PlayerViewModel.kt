@@ -1,0 +1,103 @@
+package com.miyabi0619.subsonicclient.player
+
+import android.app.Application
+import android.content.ComponentName
+import android.content.Intent
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.media3.common.Player
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
+import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.MoreExecutors
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+class PlayerViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val _playbackState = MutableStateFlow(PlaybackState())
+    val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
+
+    private var controllerFuture: ListenableFuture<MediaController>? = null
+    private var controller: MediaController? = null
+
+    init {
+        connectController()
+    }
+
+    private fun connectController() {
+        val context = getApplication<Application>().applicationContext
+        val sessionToken = SessionToken(context, ComponentName(context, PlayerService::class.java))
+        controllerFuture = MediaController.Builder(context, sessionToken).buildAsync()
+        controllerFuture?.addListener({
+            try {
+                val ctrl = controllerFuture?.get()
+                controller = ctrl
+                ctrl?.addListener(object : Player.Listener {
+                    override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        updateStateFromPlayer(ctrl)
+                    }
+                    override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+                        updateStateFromPlayer(ctrl)
+                    }
+                })
+                updateStateFromPlayer(ctrl)
+                _playbackState.value = _playbackState.value.copy(hasController = ctrl != null)
+            } catch (_: Exception) { }
+        }, MoreExecutors.directExecutor())
+    }
+
+    private fun updateStateFromPlayer(player: Player?) {
+        if (player == null) return
+        val mediaItem = player.currentMediaItem
+        _playbackState.value = _playbackState.value.copy(
+            isPlaying = player.isPlaying,
+            isReady = player.playbackState == Player.STATE_READY,
+            currentTitle = mediaItem?.mediaMetadata?.title?.toString(),
+            currentArtist = mediaItem?.mediaMetadata?.artist?.toString(),
+            hasController = true
+        )
+    }
+
+    fun play(songId: String, queueIds: List<String>, title: String? = null, artist: String? = null) {
+        val context = getApplication<Application>().applicationContext
+        val intent = Intent(context, PlayerService::class.java).apply {
+            action = PlayerService.ACTION_PLAY
+            putExtra(PlayerService.EXTRA_SONG_ID, songId)
+            putExtra(PlayerService.EXTRA_QUEUE_IDS, ArrayList(queueIds))
+            title?.let { putExtra(PlayerService.EXTRA_TITLE, it) }
+            artist?.let { putExtra(PlayerService.EXTRA_ARTIST, it) }
+        }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            context.startForegroundService(intent)
+        } else {
+            context.startService(intent)
+        }
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(500)
+            controller?.let { updateStateFromPlayer(it) }
+        }
+    }
+
+    fun playPause() {
+        controller?.let { p ->
+            if (p.isPlaying) p.pause() else p.play()
+        }
+    }
+
+    fun pause() {
+        controller?.pause()
+    }
+
+    fun play() {
+        controller?.play()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        MediaController.releaseFuture(controllerFuture ?: return)
+        controller = null
+    }
+}
