@@ -61,6 +61,7 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             isReady = player.playbackState == Player.STATE_READY,
             currentTitle = mediaItem?.mediaMetadata?.title?.toString(),
             currentArtist = mediaItem?.mediaMetadata?.artist?.toString(),
+            currentSongId = mediaItem?.mediaId?.takeIf { it.isNotBlank() },
             hasController = true,
             positionMs = player.currentPosition,
             durationMs = player.duration.coerceAtLeast(0L),

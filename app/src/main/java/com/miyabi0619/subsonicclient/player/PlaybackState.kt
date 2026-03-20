@@ -4,6 +4,7 @@ data class PlaybackState(
     val isPlaying: Boolean = false,
     val currentTitle: String? = null,
     val currentArtist: String? = null,
+    val currentSongId: String? = null,
     val isReady: Boolean = false,
     val hasController: Boolean = false,
     val positionMs: Long = 0L,

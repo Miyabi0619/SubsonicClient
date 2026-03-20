@@ -108,19 +108,16 @@ class PlayerService : MediaSessionService() {
                 songId = id,
                 maxBitRate = maxBitRate
             )
+            val builder = MediaItem.Builder().setMediaId(id).setUri(url)
             if (index == startIndex && (title != null || artist != null)) {
-                MediaItem.Builder()
-                    .setUri(url)
-                    .setMediaMetadata(
-                        MediaMetadata.Builder()
-                            .setTitle(title ?: "")
-                            .setArtist(artist ?: "")
-                            .build()
-                    )
-                    .build()
-            } else {
-                MediaItem.fromUri(url)
+                builder.setMediaMetadata(
+                    MediaMetadata.Builder()
+                        .setTitle(title ?: "")
+                        .setArtist(artist ?: "")
+                        .build()
+                )
             }
+            builder.build()
         }
         player?.let { p ->
             p.setMediaItems(mediaItems, startIndex, 0L)
