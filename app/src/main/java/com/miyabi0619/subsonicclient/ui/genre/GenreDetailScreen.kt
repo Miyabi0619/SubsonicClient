@@ -1,4 +1,4 @@
-package com.miyabi0619.subsonicclient.ui.artist
+package com.miyabi0619.subsonicclient.ui.genre
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,25 +29,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.miyabi0619.subsonicclient.data.api.AlbumDto
+import com.miyabi0619.subsonicclient.data.api.SongDto
 import com.miyabi0619.subsonicclient.data.api.SubsonicCoverArtUrlBuilder
 import com.miyabi0619.subsonicclient.data.repository.LoginRepository
 import com.miyabi0619.subsonicclient.ui.common.CoverArtImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ArtistDetailScreen(
-    artistId: String,
+fun GenreDetailScreen(
+    genreName: String,
     loginRepository: LoginRepository,
     onBack: () -> Unit,
-    onAlbumClick: (albumId: String) -> Unit,
+    onPlaySong: (songId: String, title: String?, artist: String?, queueIds: List<String>) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val viewModel: ArtistDetailViewModel = viewModel(
+    val viewModel: GenreDetailViewModel = viewModel(
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
                 @Suppress("UNCHECKED_CAST")
-                return ArtistDetailViewModel(loginRepository, artistId) as T
+                return GenreDetailViewModel(loginRepository, genreName) as T
             }
         }
     )
@@ -62,7 +62,7 @@ fun ArtistDetailScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(state.artist?.name ?: "アーティスト") },
+                title = { Text(genreName) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "戻る")
@@ -92,8 +92,18 @@ fun ArtistDetailScreen(
             ) {
                 Text(state.error!!, color = MaterialTheme.colorScheme.error)
             }
-            state.artist != null -> {
-                val albums = state.artist!!.album.orEmpty()
+            state.songs.isEmpty() && !state.isLoading -> Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(padding)
+                    .padding(32.dp),
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("曲が見つかりませんでした", style = MaterialTheme.typography.bodyMedium)
+            }
+            else -> {
+                val songs = state.songs
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -101,13 +111,18 @@ fun ArtistDetailScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(albums) { album ->
-                        AlbumRow(
-                            album = album,
-                            coverArtUrl = buildCoverArtUrl(album.coverArt),
+                    items(songs) { song ->
+                        SongRow(
+                            song = song,
+                            coverArtUrl = buildCoverArtUrl(song.coverArt),
                             onClick = {
-                                val id = album.id ?: return@AlbumRow
-                                onAlbumClick(id)
+                                val id = song.id ?: return@SongRow
+                                onPlaySong(
+                                    id,
+                                    song.title,
+                                    song.artist,
+                                    songs.mapNotNull { it.id }
+                                )
                             }
                         )
                     }
@@ -118,7 +133,7 @@ fun ArtistDetailScreen(
 }
 
 @Composable
-private fun AlbumRow(album: AlbumDto, coverArtUrl: String?, onClick: () -> Unit) {
+private fun SongRow(song: SongDto, coverArtUrl: String?, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
@@ -129,26 +144,24 @@ private fun AlbumRow(album: AlbumDto, coverArtUrl: String?, onClick: () -> Unit)
         ) {
             CoverArtImage(
                 url = coverArtUrl,
-                modifier = Modifier.size(64.dp),
-                contentDescription = album.title,
+                modifier = Modifier.size(56.dp),
+                contentDescription = song.title,
                 placeholder = {
                     Text(
-                        album.title.orEmpty().ifEmpty { album.name.orEmpty() }.take(1),
-                        style = MaterialTheme.typography.titleLarge
+                        song.title.orEmpty().take(1),
+                        style = MaterialTheme.typography.titleMedium
                     )
                 }
             )
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(
-                    text = album.title.orEmpty().ifEmpty { album.name.orEmpty() },
+                    text = song.title.orEmpty(),
                     style = MaterialTheme.typography.bodyLarge
                 )
-                album.artist?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
+                Text(
+                    text = song.artist.orEmpty(),
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
     }

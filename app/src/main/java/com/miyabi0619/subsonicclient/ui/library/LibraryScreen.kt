@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
@@ -29,7 +31,9 @@ import com.miyabi0619.subsonicclient.data.api.AlbumDto
 import com.miyabi0619.subsonicclient.data.api.ArtistDto
 import com.miyabi0619.subsonicclient.data.api.GenreDto
 import com.miyabi0619.subsonicclient.data.api.PlaylistDto
+import com.miyabi0619.subsonicclient.data.api.SubsonicCoverArtUrlBuilder
 import com.miyabi0619.subsonicclient.data.repository.LoginRepository
+import com.miyabi0619.subsonicclient.ui.common.CoverArtImage
 
 @Composable
 fun LibraryScreen(
@@ -37,6 +41,7 @@ fun LibraryScreen(
     onAlbumClick: (albumId: String) -> Unit = {},
     onArtistClick: (artistId: String) -> Unit = {},
     onPlaylistClick: (playlistId: String) -> Unit = {},
+    onGenreClick: (genreName: String) -> Unit = {},
     viewModel: LibraryViewModel = viewModel(
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
             override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
@@ -48,6 +53,11 @@ fun LibraryScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val creds by loginRepository.credentials.collectAsState(initial = null)
+
+    fun buildCoverArtUrl(coverArtId: String?): String? = creds?.let {
+        SubsonicCoverArtUrlBuilder.build(it.serverUrl, it.username, it.password, coverArtId)
+    }
 
     Scaffold(modifier = modifier) { padding ->
         Column(
@@ -90,13 +100,18 @@ fun LibraryScreen(
                 else -> when (state.selectedTab) {
                     LibraryTab.Albums -> LibraryAlbumList(
                         albums = state.albums,
+                        buildCoverArtUrl = ::buildCoverArtUrl,
                         onAlbumClick = onAlbumClick
                     )
                     LibraryTab.Artists -> LibraryArtistList(
                         artists = state.artists,
+                        buildCoverArtUrl = ::buildCoverArtUrl,
                         onArtistClick = onArtistClick
                     )
-                    LibraryTab.Genres -> LibraryGenreList(genres = state.genres)
+                    LibraryTab.Genres -> LibraryGenreList(
+                        genres = state.genres,
+                        onGenreClick = onGenreClick
+                    )
                     LibraryTab.Playlists -> LibraryPlaylistList(
                         playlists = state.playlists,
                         onPlaylistClick = onPlaylistClick
@@ -110,6 +125,7 @@ fun LibraryScreen(
 @Composable
 private fun LibraryAlbumList(
     albums: List<AlbumDto>,
+    buildCoverArtUrl: (String?) -> String?,
     onAlbumClick: (albumId: String) -> Unit = {}
 ) {
     LazyColumn(
@@ -126,17 +142,33 @@ private fun LibraryAlbumList(
                     },
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
-                Text(
-                    text = album.title.orEmpty().ifEmpty { album.name.orEmpty() },
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(16.dp)
-                )
-                album.artist?.let { artist ->
-                    Text(
-                        text = artist,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CoverArtImage(
+                        url = buildCoverArtUrl(album.coverArt),
+                        modifier = Modifier.size(64.dp),
+                        contentDescription = album.title,
+                        placeholder = {
+                            Text(
+                                album.title.orEmpty().ifEmpty { album.name.orEmpty() }.take(1),
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                        }
                     )
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = album.title.orEmpty().ifEmpty { album.name.orEmpty() },
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        album.artist?.let { artist ->
+                            Text(
+                                text = artist,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -146,6 +178,7 @@ private fun LibraryAlbumList(
 @Composable
 private fun LibraryArtistList(
     artists: List<ArtistDto>,
+    buildCoverArtUrl: (String?) -> String?,
     onArtistClick: (artistId: String) -> Unit = {}
 ) {
     LazyColumn(
@@ -162,25 +195,47 @@ private fun LibraryArtistList(
                     },
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
-                Text(
-                    text = artist.name.orEmpty(),
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.padding(16.dp)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CoverArtImage(
+                        url = artist.artistImageUrl ?: buildCoverArtUrl(artist.coverArt),
+                        modifier = Modifier.size(64.dp),
+                        contentDescription = artist.name,
+                        placeholder = {
+                            Text(
+                                artist.name.orEmpty().take(1),
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                        }
+                    )
+                    Text(
+                        text = artist.name.orEmpty(),
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun LibraryGenreList(genres: List<GenreDto>) {
+private fun LibraryGenreList(
+    genres: List<GenreDto>,
+    onGenreClick: (genreName: String) -> Unit = {}
+) {
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(genres) { genre ->
             Card(
-                modifier = Modifier.fillMaxWidth().clickable { },
+                modifier = Modifier.fillMaxWidth().clickable {
+                    val name = genre.value ?: return@clickable
+                    onGenreClick(name)
+                },
                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Text(

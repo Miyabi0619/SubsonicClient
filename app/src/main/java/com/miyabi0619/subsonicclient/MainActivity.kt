@@ -47,6 +47,7 @@ import com.miyabi0619.subsonicclient.ui.album.AlbumDetailScreen
 import com.miyabi0619.subsonicclient.ui.artist.ArtistDetailScreen
 import com.miyabi0619.subsonicclient.ui.playlist.PlaylistDetailScreen
 import com.miyabi0619.subsonicclient.ui.player.NowPlayingScreen
+import com.miyabi0619.subsonicclient.ui.genre.GenreDetailScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -160,7 +161,10 @@ fun MainScreen(
                     loginRepository = loginRepository,
                     onAlbumClick = { albumId -> navController.navigate("album/$albumId") },
                     onArtistClick = { artistId -> navController.navigate("artist/$artistId") },
-                    onPlaylistClick = { playlistId -> navController.navigate("playlist/$playlistId") }
+                    onPlaylistClick = { playlistId -> navController.navigate("playlist/$playlistId") },
+                    onGenreClick = { genreName ->
+                        navController.navigate("genre/${java.net.URLEncoder.encode(genreName, "UTF-8")}")
+                    }
                 )
             }
             composable(AppDestinations.Search.route) {
@@ -209,6 +213,16 @@ fun MainScreen(
                 val playlistId = backStackEntry.arguments?.getString("playlistId") ?: return@composable
                 PlaylistDetailScreen(
                     playlistId = playlistId,
+                    loginRepository = loginRepository,
+                    onBack = { navController.popBackStack() },
+                    onPlaySong = onPlaySong
+                )
+            }
+            composable("genre/{genreName}") { backStackEntry ->
+                val encoded = backStackEntry.arguments?.getString("genreName") ?: return@composable
+                val genreName = java.net.URLDecoder.decode(encoded, "UTF-8")
+                GenreDetailScreen(
+                    genreName = genreName,
                     loginRepository = loginRepository,
                     onBack = { navController.popBackStack() },
                     onPlaySong = onPlaySong

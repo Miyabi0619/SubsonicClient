@@ -61,8 +61,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             currentArtist = mediaItem?.mediaMetadata?.artist?.toString(),
             hasController = true,
             positionMs = player.currentPosition,
-            durationMs = player.duration.coerceAtLeast(0L)
+            durationMs = player.duration.coerceAtLeast(0L),
+            queueIndex = player.currentMediaItemIndex,
+            queueSize = player.mediaItemCount
         )
+    }
+
+    fun seekToMediaItem(index: Int) {
+        controller?.seekToDefaultPosition(index)
     }
 
     private fun startPositionUpdates(player: Player?) {

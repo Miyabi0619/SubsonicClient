@@ -1,6 +1,5 @@
 package com.miyabi0619.subsonicclient.ui.home
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -32,7 +32,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.miyabi0619.subsonicclient.data.api.AlbumDto
 import com.miyabi0619.subsonicclient.data.api.ArtistDto
 import com.miyabi0619.subsonicclient.data.api.SongDto
+import com.miyabi0619.subsonicclient.data.api.SubsonicCoverArtUrlBuilder
 import com.miyabi0619.subsonicclient.data.repository.LoginRepository
+import com.miyabi0619.subsonicclient.ui.common.CoverArtImage
 
 @Composable
 fun HomeScreen(
@@ -50,6 +52,11 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     val state by viewModel.uiState.collectAsState()
+    val creds by loginRepository.credentials.collectAsState(initial = null)
+
+    fun buildCoverArtUrl(coverArtId: String?): String? = creds?.let {
+        SubsonicCoverArtUrlBuilder.build(it.serverUrl, it.username, it.password, coverArtId)
+    }
 
     Scaffold(modifier = modifier) { padding ->
         when {
@@ -90,6 +97,7 @@ fun HomeScreen(
                             items(state.recentAlbums) { album ->
                                 AlbumCard(
                                     album = album,
+                                    coverArtUrl = buildCoverArtUrl(album.coverArt),
                                     onClick = {
                                         val id = album.id ?: return@AlbumCard
                                         onAlbumClick(id)
@@ -113,6 +121,7 @@ fun HomeScreen(
                             items(state.randomSongs) { song ->
                                 SongCard(
                                     song = song,
+                                    coverArtUrl = buildCoverArtUrl(song.coverArt),
                                     onClick = {
                                         val id = song.id ?: return@SongCard
                                         onPlaySong(id, song.title, song.artist, state.randomSongs.mapNotNull { it.id })
@@ -134,7 +143,11 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             items(state.artists.take(20)) { artist ->
-                                ArtistCard(artist = artist)
+                                ArtistCard(
+                                    artist = artist,
+                                    coverArtUrl = artist.artistImageUrl
+                                        ?: buildCoverArtUrl(artist.coverArt)
+                                )
                             }
                         }
                     }
@@ -145,24 +158,23 @@ fun HomeScreen(
 }
 
 @Composable
-private fun AlbumCard(album: AlbumDto, onClick: () -> Unit = {}) {
+private fun AlbumCard(album: AlbumDto, coverArtUrl: String?, onClick: () -> Unit = {}) {
     Card(
-        modifier = Modifier.size(140.dp).clickable(onClick = onClick),
+        modifier = Modifier.width(140.dp).clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .size(140.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    album.title.orEmpty().ifEmpty { album.name.orEmpty() }.take(1),
-                    style = MaterialTheme.typography.headlineMedium
-                )
-            }
+            CoverArtImage(
+                url = coverArtUrl,
+                modifier = Modifier.fillMaxWidth().height(110.dp),
+                contentDescription = album.title,
+                placeholder = {
+                    Text(
+                        album.title.orEmpty().ifEmpty { album.name.orEmpty() }.take(1),
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                }
+            )
             Text(
                 text = album.title.orEmpty().ifEmpty { album.name.orEmpty() },
                 style = MaterialTheme.typography.bodySmall,
@@ -174,7 +186,7 @@ private fun AlbumCard(album: AlbumDto, onClick: () -> Unit = {}) {
 }
 
 @Composable
-private fun SongCard(song: SongDto, onClick: () -> Unit = {}) {
+private fun SongCard(song: SongDto, coverArtUrl: String?, onClick: () -> Unit = {}) {
     Card(
         modifier = Modifier
             .height(72.dp)
@@ -188,17 +200,17 @@ private fun SongCard(song: SongDto, onClick: () -> Unit = {}) {
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    song.title.orEmpty().take(1),
-                    style = MaterialTheme.typography.titleMedium
-                )
-            }
+            CoverArtImage(
+                url = coverArtUrl,
+                modifier = Modifier.size(48.dp),
+                contentDescription = song.title,
+                placeholder = {
+                    Text(
+                        song.title.orEmpty().take(1),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            )
             Spacer(modifier = Modifier.size(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -217,23 +229,23 @@ private fun SongCard(song: SongDto, onClick: () -> Unit = {}) {
 }
 
 @Composable
-private fun ArtistCard(artist: ArtistDto) {
+private fun ArtistCard(artist: ArtistDto, coverArtUrl: String?) {
     Card(
         modifier = Modifier.size(100.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    artist.name.orEmpty().take(1),
-                    style = MaterialTheme.typography.headlineSmall
-                )
-            }
+            CoverArtImage(
+                url = coverArtUrl,
+                modifier = Modifier.size(72.dp),
+                contentDescription = artist.name,
+                placeholder = {
+                    Text(
+                        artist.name.orEmpty().take(1),
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                }
+            )
             Text(
                 text = artist.name.orEmpty(),
                 style = MaterialTheme.typography.labelSmall,

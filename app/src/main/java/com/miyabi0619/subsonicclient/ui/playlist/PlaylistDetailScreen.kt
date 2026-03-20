@@ -4,8 +4,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -28,7 +30,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.miyabi0619.subsonicclient.data.api.SongDto
+import com.miyabi0619.subsonicclient.data.api.SubsonicCoverArtUrlBuilder
 import com.miyabi0619.subsonicclient.data.repository.LoginRepository
+import com.miyabi0619.subsonicclient.ui.common.CoverArtImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +52,11 @@ fun PlaylistDetailScreen(
         }
     )
     val state by viewModel.uiState.collectAsState()
+    val creds by loginRepository.credentials.collectAsState(initial = null)
+
+    fun buildCoverArtUrl(coverArtId: String?): String? = creds?.let {
+        SubsonicCoverArtUrlBuilder.build(it.serverUrl, it.username, it.password, coverArtId)
+    }
 
     Scaffold(
         modifier = modifier,
@@ -93,33 +102,56 @@ fun PlaylistDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(songs) { song ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    val id = song.id ?: return@clickable
-                                    onPlaySong(
-                                        id,
-                                        song.title,
-                                        song.artist,
-                                        songs.mapNotNull { it.id }
-                                    )
-                                },
-                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    text = song.title.orEmpty(),
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
-                                Text(
-                                    text = song.artist.orEmpty(),
-                                    style = MaterialTheme.typography.bodySmall
+                        SongRow(
+                            song = song,
+                            coverArtUrl = buildCoverArtUrl(song.coverArt),
+                            onClick = {
+                                val id = song.id ?: return@SongRow
+                                onPlaySong(
+                                    id,
+                                    song.title,
+                                    song.artist,
+                                    songs.mapNotNull { it.id }
                                 )
                             }
-                        }
+                        )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SongRow(song: SongDto, coverArtUrl: String?, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CoverArtImage(
+                url = coverArtUrl,
+                modifier = Modifier.size(56.dp),
+                contentDescription = song.title,
+                placeholder = {
+                    Text(
+                        song.title.orEmpty().take(1),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+            )
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = song.title.orEmpty(),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = song.artist.orEmpty(),
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
     }

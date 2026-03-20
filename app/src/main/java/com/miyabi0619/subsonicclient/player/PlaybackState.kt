@@ -7,5 +7,7 @@ data class PlaybackState(
     val isReady: Boolean = false,
     val hasController: Boolean = false,
     val positionMs: Long = 0L,
-    val durationMs: Long = 0L
+    val durationMs: Long = 0L,
+    val queueIndex: Int = 0,
+    val queueSize: Int = 0
 )
