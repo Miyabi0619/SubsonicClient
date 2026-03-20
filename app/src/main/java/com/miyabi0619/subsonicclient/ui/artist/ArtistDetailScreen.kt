@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -71,45 +73,43 @@ fun ArtistDetailScreen(
             )
         }
     ) { padding ->
-        when {
-            state.isLoading -> Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(padding)
-                    .padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                CircularProgressIndicator()
-            }
-            state.error != null -> Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(padding)
-                    .padding(32.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(state.error!!, color = MaterialTheme.colorScheme.error)
-            }
-            state.artist != null -> {
-                val albums = state.artist!!.album.orEmpty()
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(padding),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+        PullToRefreshBox(
+            isRefreshing = state.isLoading,
+            onRefresh = { viewModel.load() },
+            modifier = Modifier.fillMaxSize().padding(padding)
+        ) {
+            when {
+                state.isLoading -> Column(
+                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    items(albums) { album ->
-                        AlbumRow(
-                            album = album,
-                            coverArtUrl = buildCoverArtUrl(album.coverArt),
-                            onClick = {
-                                val id = album.id ?: return@AlbumRow
-                                onAlbumClick(id)
-                            }
-                        )
+                    CircularProgressIndicator()
+                }
+                state.error != null -> Column(
+                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(state.error!!, color = MaterialTheme.colorScheme.error)
+                }
+                state.artist != null -> {
+                    val albums = state.artist!!.album.orEmpty()
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(albums) { album ->
+                            AlbumRow(
+                                album = album,
+                                coverArtUrl = buildCoverArtUrl(album.coverArt),
+                                onClick = {
+                                    val id = album.id ?: return@AlbumRow
+                                    onAlbumClick(id)
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -144,10 +144,7 @@ private fun AlbumRow(album: AlbumDto, coverArtUrl: String?, onClick: () -> Unit)
                     style = MaterialTheme.typography.bodyLarge
                 )
                 album.artist?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    Text(text = it, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }

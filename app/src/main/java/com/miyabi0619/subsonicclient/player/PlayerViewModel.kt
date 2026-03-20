@@ -43,6 +43,8 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
                     override fun onIsPlayingChanged(isPlaying: Boolean) { updateStateFromPlayer(ctrl) }
                     override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) { updateStateFromPlayer(ctrl) }
                     override fun onPlaybackStateChanged(playbackState: Int) { updateStateFromPlayer(ctrl) }
+                    override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) { updateStateFromPlayer(ctrl) }
+                    override fun onRepeatModeChanged(repeatMode: Int) { updateStateFromPlayer(ctrl) }
                 })
                 updateStateFromPlayer(ctrl)
                 _playbackState.value = _playbackState.value.copy(hasController = ctrl != null)
@@ -63,8 +65,24 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
             positionMs = player.currentPosition,
             durationMs = player.duration.coerceAtLeast(0L),
             queueIndex = player.currentMediaItemIndex,
-            queueSize = player.mediaItemCount
+            queueSize = player.mediaItemCount,
+            shuffleEnabled = player.shuffleModeEnabled,
+            repeatMode = player.repeatMode
         )
+    }
+
+    fun toggleShuffle() {
+        controller?.let { p -> p.shuffleModeEnabled = !p.shuffleModeEnabled }
+    }
+
+    fun cycleRepeatMode() {
+        controller?.let { p ->
+            p.repeatMode = when (p.repeatMode) {
+                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ONE
+                Player.REPEAT_MODE_ONE -> Player.REPEAT_MODE_ALL
+                else -> Player.REPEAT_MODE_OFF
+            }
+        }
     }
 
     fun seekToMediaItem(index: Int) {

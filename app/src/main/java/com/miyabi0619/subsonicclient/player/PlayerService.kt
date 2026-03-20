@@ -15,6 +15,7 @@ import androidx.media3.session.MediaSessionService
 import com.miyabi0619.subsonicclient.R
 import com.miyabi0619.subsonicclient.data.api.SubsonicStreamUrlBuilder
 import com.miyabi0619.subsonicclient.data.prefs.CredentialsStore
+import com.miyabi0619.subsonicclient.data.prefs.AppSettingsStore
 import com.miyabi0619.subsonicclient.eq.EqApplier
 import com.miyabi0619.subsonicclient.eq.EqStore
 import kotlinx.coroutines.CoroutineScope
@@ -32,6 +33,7 @@ class PlayerService : MediaSessionService() {
     private var player: ExoPlayer? = null
     private lateinit var credentialsStore: CredentialsStore
     private lateinit var eqStore: EqStore
+    private lateinit var appSettingsStore: AppSettingsStore
     private var eqApplier: EqApplier? = null
 
     override fun onCreate() {
@@ -39,6 +41,7 @@ class PlayerService : MediaSessionService() {
         createNotificationChannel()
         credentialsStore = CredentialsStore(applicationContext)
         eqStore = EqStore(applicationContext)
+        appSettingsStore = AppSettingsStore(applicationContext)
         val exoPlayer = ExoPlayer.Builder(this).build().apply {
             repeatMode = Player.REPEAT_MODE_OFF
             playWhenReady = true
@@ -95,13 +98,15 @@ class PlayerService : MediaSessionService() {
         artist: String? = null
     ) {
         val creds = credentialsStore.credentials.first() ?: return
+        val maxBitRate = appSettingsStore.maxBitRate.first().let { if (it > 0) it else null }
         val startIndex = queueIds.indexOf(songId).coerceAtLeast(0)
         val mediaItems = queueIds.mapIndexed { index, id ->
             val url = SubsonicStreamUrlBuilder.build(
                 baseUrl = creds.serverUrl,
                 username = creds.username,
                 password = creds.password,
-                songId = id
+                songId = id,
+                maxBitRate = maxBitRate
             )
             if (index == startIndex && (title != null || artist != null)) {
                 MediaItem.Builder()

@@ -18,12 +18,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -95,6 +99,16 @@ fun NowPlayingScreen(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val activeTint = MaterialTheme.colorScheme.primary
+                    val inactiveTint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+
+                    IconButton(onClick = { playerViewModel.toggleShuffle() }) {
+                        Icon(
+                            Icons.Default.Shuffle,
+                            contentDescription = "シャッフル",
+                            tint = if (state.shuffleEnabled) activeTint else inactiveTint
+                        )
+                    }
                     IconButton(onClick = { playerViewModel.seekToPrevious() }) {
                         Icon(Icons.Default.SkipPrevious, contentDescription = "前の曲")
                     }
@@ -106,6 +120,13 @@ fun NowPlayingScreen(
                     }
                     IconButton(onClick = { playerViewModel.seekToNext() }) {
                         Icon(Icons.Default.SkipNext, contentDescription = "次の曲")
+                    }
+                    IconButton(onClick = { playerViewModel.cycleRepeatMode() }) {
+                        Icon(
+                            imageVector = if (state.repeatMode == 1) Icons.Default.RepeatOne else Icons.Default.Repeat,
+                            contentDescription = "リピート",
+                            tint = if (state.repeatMode != 0) activeTint else inactiveTint
+                        )
                     }
                 }
             }
