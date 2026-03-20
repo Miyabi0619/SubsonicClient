@@ -29,7 +29,8 @@ data class SubsonicBody(
     @Json(name = "songsByGenre") val songsByGenre: SongsByGenre?,
     @Json(name = "playlists") val playlists: Playlists?,
     @Json(name = "playlist") val playlist: PlaylistDetail?,
-    @Json(name = "searchResult3") val searchResult3: SearchResult3?
+    @Json(name = "searchResult3") val searchResult3: SearchResult3?,
+    @Json(name = "lyrics") val lyrics: LyricsDto?
 )
 
 @JsonClass(generateAdapter = true)
@@ -173,6 +174,13 @@ data class PlaylistDetail(
     @Json(name = "duration") val duration: Int?,
     @Json(name = "owner") val owner: String?,
     @Json(name = "entry") val entry: List<SongDto>?
+)
+
+@JsonClass(generateAdapter = true)
+data class LyricsDto(
+    @Json(name = "artist") val artist: String?,
+    @Json(name = "title") val title: String?,
+    @Json(name = "value") val value: String?
 )
 
 @JsonClass(generateAdapter = true)

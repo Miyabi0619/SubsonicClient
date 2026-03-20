@@ -134,7 +134,9 @@ class PlayerService : MediaSessionService() {
         if (audioSessionId == 0) return
         eqApplier?.release()
         val applier = EqApplier(audioSessionId)
-        if (applier.attach()) {
+        val attached = applier.attach()
+        serviceScope.launch { eqStore.setHardwareAvailable(attached) }
+        if (attached) {
             serviceScope.launch {
                 eqStore.eqState.first().let { applier.apply(it) }
             }

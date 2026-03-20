@@ -1,6 +1,5 @@
 package com.miyabi0619.subsonicclient.ui.player
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Pause
@@ -23,27 +24,34 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.miyabi0619.subsonicclient.data.repository.LoginRepository
 import com.miyabi0619.subsonicclient.player.PlaybackState
 import com.miyabi0619.subsonicclient.player.PlayerViewModel
 
@@ -51,10 +59,27 @@ import com.miyabi0619.subsonicclient.player.PlayerViewModel
 @Composable
 fun NowPlayingScreen(
     playerViewModel: PlayerViewModel,
+    loginRepository: LoginRepository,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state by playerViewModel.playbackState.collectAsState()
+
+    val lyricsViewModel: LyricsViewModel = viewModel(
+        factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+            override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                @Suppress("UNCHECKED_CAST")
+                return LyricsViewModel(loginRepository) as T
+            }
+        }
+    )
+    val lyricsState by lyricsViewModel.uiState.collectAsState()
+
+    LaunchedEffect(state.currentTitle, state.currentArtist) {
+        lyricsViewModel.loadLyrics(state.currentArtist, state.currentTitle)
+    }
+
+    var selectedTab by remember { mutableIntStateOf(0) }
 
     Scaffold(
         modifier = modifier,
@@ -131,15 +156,68 @@ fun NowPlayingScreen(
                 }
             }
 
-            if (state.queueSize > 1) {
-                HorizontalDivider()
-                QueueSection(
-                    queueSize = state.queueSize,
-                    queueIndex = state.queueIndex,
-                    onItemClick = { index -> playerViewModel.seekToMediaItem(index) },
+            HorizontalDivider()
+
+            val hasQueue = state.queueSize > 1
+            if (hasQueue) {
+                TabRow(selectedTabIndex = selectedTab) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = { Text("キュー") }
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = { Text("歌詞") }
+                    )
+                }
+                when (selectedTab) {
+                    0 -> QueueSection(
+                        queueSize = state.queueSize,
+                        queueIndex = state.queueIndex,
+                        onItemClick = { index -> playerViewModel.seekToMediaItem(index) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    1 -> LyricsSection(
+                        lyricsState = lyricsState,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            } else {
+                LyricsSection(
+                    lyricsState = lyricsState,
                     modifier = Modifier.weight(1f)
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun LyricsSection(
+    lyricsState: LyricsUiState,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center
+    ) {
+        when {
+            lyricsState.isLoading -> CircularProgressIndicator()
+            lyricsState.isUnavailable -> Text(
+                "歌詞が見つかりませんでした",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            lyricsState.lyrics != null -> Text(
+                text = lyricsState.lyrics,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
+            )
         }
     }
 }

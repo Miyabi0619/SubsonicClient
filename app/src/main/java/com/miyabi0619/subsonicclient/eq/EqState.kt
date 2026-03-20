@@ -16,7 +16,8 @@ data class EqBand(
 data class EqState(
     val bands: List<EqBand>,
     val enabled: Boolean = true,
-    val presetName: String? = null
+    val presetName: String? = null,
+    val hardwareAvailable: Boolean? = null  // null=未確認, true=利用可, false=非対応
 ) {
     fun bandGains(): FloatArray = FloatArray(bands.size) { i -> bands.getOrNull(i)?.gainDb ?: 0f }
 }

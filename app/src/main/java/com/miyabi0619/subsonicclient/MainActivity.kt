@@ -197,6 +197,7 @@ fun MainScreen(
             composable("nowplaying") {
                 NowPlayingScreen(
                     playerViewModel = playerViewModel,
+                    loginRepository = loginRepository,
                     onBack = { navController.popBackStack() }
                 )
             }

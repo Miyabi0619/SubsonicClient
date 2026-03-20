@@ -50,4 +50,10 @@ interface SubsonicApi {
 
     @GET("search3.view")
     suspend fun search3(@Query("query") query: String): SubsonicEnvelope
+
+    @GET("getLyrics.view")
+    suspend fun getLyrics(
+        @Query("artist") artist: String? = null,
+        @Query("title") title: String? = null
+    ): SubsonicEnvelope
 }
