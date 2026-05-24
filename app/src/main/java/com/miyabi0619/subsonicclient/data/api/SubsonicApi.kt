@@ -48,6 +48,9 @@ interface SubsonicApi {
     @GET("getPlaylist.view")
     suspend fun getPlaylist(@Query("id") id: String): SubsonicEnvelope
 
+    @GET("getSong.view")
+    suspend fun getSong(@Query("id") id: String): SubsonicEnvelope
+
     @GET("search3.view")
     suspend fun search3(@Query("query") query: String): SubsonicEnvelope
 
