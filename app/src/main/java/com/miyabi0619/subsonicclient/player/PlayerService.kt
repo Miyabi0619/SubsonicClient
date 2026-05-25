@@ -8,6 +8,8 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
+import android.provider.MediaStore
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -28,7 +30,9 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.SettableFuture
 import com.miyabi0619.subsonicclient.MainActivity
 import com.miyabi0619.subsonicclient.R
+import com.miyabi0619.subsonicclient.data.api.AlbumDto
 import com.miyabi0619.subsonicclient.data.api.PlaylistDto
+import com.miyabi0619.subsonicclient.data.api.SearchResult3
 import com.miyabi0619.subsonicclient.data.api.SongDto
 import com.miyabi0619.subsonicclient.data.api.SubsonicApi
 import com.miyabi0619.subsonicclient.data.api.SubsonicClientFactory
@@ -66,6 +70,7 @@ class PlayerService : MediaLibraryService() {
     private var eqApplier: EqApplier? = null
     private var eqStateJob: Job? = null
     private val songCache = ConcurrentHashMap<String, CachedSong>()
+    private val autoSearchCache = ConcurrentHashMap<String, List<CachedSong>>()
 
     override fun onCreate() {
         super.onCreate()
@@ -251,11 +256,19 @@ class PlayerService : MediaLibraryService() {
             serviceScope.launch(Dispatchers.IO) {
                 val resolved = runCatching {
                     val context = autoContext() ?: return@runCatching mediaItems.map { loginRequiredItem() }
-                    mediaItems.map { item -> playableItemForPlayback(item, context) }
+                    buildList {
+                        mediaItems.forEach { item ->
+                            if (item.isSearchPlaybackRequest()) {
+                                addAll(resolveSearchPlaybackQueue(item, context))
+                            } else {
+                                add(playableItemForPlayback(item, context))
+                            }
+                        }
+                    }
                 }.getOrElse { error ->
                     mediaItems.map { unavailableItem("再生できません", error.userFacingMessage()) }
                 }
-                future.set(resolved)
+                future.set(resolved.ifEmpty { listOf(unavailableItem("検索結果がありません")) })
             }
             return future
         }
@@ -265,8 +278,30 @@ class PlayerService : MediaLibraryService() {
             browser: MediaSession.ControllerInfo,
             query: String,
             params: LibraryParams?
-        ): ListenableFuture<LibraryResult<Void>> =
-            Futures.immediateFuture(LibraryResult.ofVoid(params))
+        ): ListenableFuture<LibraryResult<Void>> {
+            val future = SettableFuture.create<LibraryResult<Void>>()
+            val trimmed = query.trim()
+            if (trimmed.isBlank()) {
+                return Futures.immediateFuture(LibraryResult.ofVoid(params))
+            }
+            serviceScope.launch(Dispatchers.IO) {
+                val result = runCatching {
+                    val context = autoContext() ?: return@runCatching emptyList()
+                    autoSearchSongs(trimmed, null, context)
+                }
+                val songs = result.getOrDefault(emptyList())
+                autoSearchCache[trimmed] = songs.mapNotNull { it.toCachedSongOrNull() }
+                session.notifySearchResultChanged(browser, trimmed, songs.size, params)
+                future.set(
+                    if (result.isSuccess) {
+                        LibraryResult.ofVoid(params)
+                    } else {
+                        LibraryResult.ofError(LibraryResult.RESULT_ERROR_IO)
+                    }
+                )
+            }
+            return future
+        }
 
         override fun onGetSearchResult(
             session: MediaLibrarySession,
@@ -281,12 +316,16 @@ class PlayerService : MediaLibraryService() {
                 if (trimmed.isBlank()) {
                     emptyList()
                 } else {
-                    context.api.search3(trimmed)
-                        .bodyOrThrow()
-                        .searchResult3
-                        ?.song
-                        .orEmpty()
-                        .map { it.toPlayableMediaItem(context) }
+                    val cachedSongs = autoSearchCache[trimmed]
+                    if (cachedSongs != null) {
+                        cachedSongs.map { it.toPlayableMediaItem(context) }
+                    } else {
+                        autoSearchSongs(trimmed, null, context)
+                            .also { songs ->
+                                autoSearchCache[trimmed] = songs.mapNotNull { it.toCachedSongOrNull() }
+                            }
+                            .map { it.toPlayableMediaItem(context) }
+                    }
                 }
             }
     }
@@ -393,6 +432,142 @@ class PlayerService : MediaLibraryService() {
         }
         cachedSongForId(mediaId)?.let { return it.toPlayableMediaItem(context) }
         return playableItemForSongId(mediaId, item.mediaMetadata, context)
+    }
+
+    private fun MediaItem.isSearchPlaybackRequest(): Boolean =
+        mediaId.isBlank() &&
+            localConfiguration == null &&
+            requestMetadata.mediaUri == null
+
+    private suspend fun resolveSearchPlaybackQueue(item: MediaItem, context: AutoContext): List<MediaItem> {
+        val query = item.requestMetadata.searchQuery.orEmpty()
+        val extras = item.requestMetadata.extras
+        return autoSearchSongs(query, extras, context).map { it.toPlayableMediaItem(context) }
+    }
+
+    @Suppress("DEPRECATION")
+    private suspend fun autoSearchSongs(
+        query: String,
+        extras: Bundle?,
+        context: AutoContext
+    ): List<SongDto> {
+        val searchTerm = voiceSearchTerm(query, extras)
+        if (searchTerm.isBlank()) {
+            return context.api.getRandomSongs(RANDOM_SONG_COUNT)
+                .bodyOrThrow()
+                .randomSongs
+                ?.song
+                .orEmpty()
+        }
+
+        val focus = extras?.getString(MediaStore.EXTRA_MEDIA_FOCUS).orEmpty()
+        return when {
+            focus == MediaStore.Audio.Genres.ENTRY_CONTENT_TYPE ||
+                extras.hasNonBlankString(MediaStore.EXTRA_MEDIA_GENRE) ->
+                context.api.getSongsByGenre(searchTerm, VOICE_SEARCH_SONG_COUNT)
+                    .bodyOrThrow()
+                    .songsByGenre
+                    ?.song
+                    .orEmpty()
+
+            focus == MediaStore.Audio.Playlists.ENTRY_CONTENT_TYPE ||
+                extras.hasNonBlankString(MediaStore.EXTRA_MEDIA_PLAYLIST) ->
+                songsForPlaylistSearch(searchTerm, context)
+
+            focus == MediaStore.Audio.Albums.ENTRY_CONTENT_TYPE ||
+                extras.hasNonBlankString(MediaStore.EXTRA_MEDIA_ALBUM) ->
+                songsForAlbumSearch(searchTerm, context)
+
+            focus == MediaStore.Audio.Artists.ENTRY_CONTENT_TYPE ||
+                extras.hasNonBlankString(MediaStore.EXTRA_MEDIA_ARTIST) ->
+                songsForArtistSearch(searchTerm, context)
+
+            else ->
+                searchResult(searchTerm, context).song.orEmpty()
+        }.take(VOICE_SEARCH_SONG_COUNT)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun voiceSearchTerm(query: String, extras: Bundle?): String =
+        listOf(
+            extras?.getString(MediaStore.EXTRA_MEDIA_TITLE),
+            extras?.getString(MediaStore.EXTRA_MEDIA_ARTIST),
+            extras?.getString(MediaStore.EXTRA_MEDIA_ALBUM),
+            extras?.getString(MediaStore.EXTRA_MEDIA_PLAYLIST),
+            extras?.getString(MediaStore.EXTRA_MEDIA_GENRE),
+            query
+        ).firstOrNull { !it.isNullOrBlank() }?.trim().orEmpty()
+
+    private suspend fun songsForPlaylistSearch(query: String, context: AutoContext): List<SongDto> {
+        val playlist = searchResult(query, context).playlist.orEmpty()
+            .bestStringMatch(query) { it.name }
+            ?: return emptyList()
+        val playlistId = playlist.id?.takeIf { it.isNotBlank() } ?: return emptyList()
+        return context.api.getPlaylist(playlistId)
+            .bodyOrThrow()
+            .playlist
+            ?.entry
+            .orEmpty()
+    }
+
+    private suspend fun songsForAlbumSearch(query: String, context: AutoContext): List<SongDto> {
+        val album = searchResult(query, context).album.orEmpty()
+            .bestListMatch(query) { listOfNotNull(it.title, it.name) }
+            ?: return emptyList()
+        return songsForAlbum(album, context)
+    }
+
+    private suspend fun songsForArtistSearch(query: String, context: AutoContext): List<SongDto> {
+        val result = searchResult(query, context)
+        val directSongMatches = result.song.orEmpty()
+            .filter { song -> song.artist?.contains(query, ignoreCase = true) == true }
+        if (directSongMatches.isNotEmpty()) return directSongMatches
+
+        val artist = result.artist.orEmpty().bestStringMatch(query) { it.name } ?: return emptyList()
+        val artistId = artist.id?.takeIf { it.isNotBlank() } ?: return emptyList()
+        val albums = context.api.getArtist(artistId)
+            .bodyOrThrow()
+            .artist
+            ?.album
+            .orEmpty()
+
+        val songs = mutableListOf<SongDto>()
+        for (album in albums.take(VOICE_SEARCH_ALBUM_LIMIT)) {
+            songs += songsForAlbum(album, context)
+            if (songs.size >= VOICE_SEARCH_SONG_COUNT) break
+        }
+        return songs
+    }
+
+    private suspend fun songsForAlbum(album: AlbumDto, context: AutoContext): List<SongDto> {
+        val albumId = album.id?.takeIf { it.isNotBlank() } ?: return emptyList()
+        return context.api.getAlbum(albumId)
+            .bodyOrThrow()
+            .album
+            ?.song
+            .orEmpty()
+    }
+
+    private suspend fun searchResult(query: String, context: AutoContext): SearchResult3 =
+        context.api.search3(query)
+            .bodyOrThrow()
+            .searchResult3
+            ?: SearchResult3()
+
+    private fun Bundle?.hasNonBlankString(key: String): Boolean =
+        this?.getString(key)?.isNotBlank() == true
+
+    private fun <T> List<T>.bestStringMatch(query: String, names: (T) -> String?): T? =
+        bestListMatch(query) { item -> listOfNotNull(names(item)) }
+
+    private fun <T> List<T>.bestListMatch(query: String, names: (T) -> List<String>): T? {
+        val normalizedQuery = query.trim()
+        if (normalizedQuery.isBlank()) return firstOrNull()
+        return firstOrNull { item ->
+            names(item).any { name -> name.equals(normalizedQuery, ignoreCase = true) }
+        } ?: firstOrNull { item ->
+            names(item).any { name -> name.contains(normalizedQuery, ignoreCase = true) }
+        } ?: firstOrNull()
     }
 
     private fun mediaItemFor(mediaId: String, uri: String, metadata: MediaMetadata?): MediaItem {
@@ -525,22 +700,15 @@ class PlayerService : MediaLibraryService() {
         message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName
 
     private fun cacheSong(song: SongDto) {
-        val songId = song.id?.takeIf { it.isNotBlank() } ?: return
-        val cachedSong = CachedSong(
-            id = songId,
-            title = song.title,
-            artist = song.artist,
-            album = song.album,
-            coverArt = song.coverArt
-        )
-        songCache[songId] = cachedSong
+        val cachedSong = song.toCachedSongOrNull() ?: return
+        songCache[cachedSong.id] = cachedSong
         val json = JSONObject()
             .put("id", cachedSong.id)
             .put("title", cachedSong.title)
             .put("artist", cachedSong.artist)
             .put("album", cachedSong.album)
             .put("coverArt", cachedSong.coverArt)
-        songMetadataCachePreferences.edit().putString(songId, json.toString()).apply()
+        songMetadataCachePreferences.edit().putString(cachedSong.id, json.toString()).apply()
     }
 
     private fun cachedSongForId(mediaId: String): CachedSong? {
@@ -560,6 +728,17 @@ class PlayerService : MediaLibraryService() {
                 songCache[song.id] = song
             }
         }
+    }
+
+    private fun SongDto.toCachedSongOrNull(): CachedSong? {
+        val songId = id?.takeIf { it.isNotBlank() } ?: return null
+        return CachedSong(
+            id = songId,
+            title = title,
+            artist = artist,
+            album = album,
+            coverArt = coverArt
+        )
     }
 
     private fun JSONObject.nullableString(key: String): String? =
@@ -634,5 +813,7 @@ class PlayerService : MediaLibraryService() {
         private const val MEDIA_ID_PLAYLIST_PREFIX = "playlist:"
         private const val MEDIA_ID_UNAVAILABLE_PREFIX = "unavailable:"
         private const val RANDOM_SONG_COUNT = 50
+        private const val VOICE_SEARCH_SONG_COUNT = 50
+        private const val VOICE_SEARCH_ALBUM_LIMIT = 10
     }
 }
