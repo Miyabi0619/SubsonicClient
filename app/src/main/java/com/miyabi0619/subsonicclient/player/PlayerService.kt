@@ -148,13 +148,18 @@ class PlayerService : MediaLibraryService() {
         when (intent?.action) {
             ACTION_PLAY -> {
                 val songId = intent.getStringExtra(EXTRA_SONG_ID)
-                val queueIds = intent.getStringArrayListExtra(EXTRA_QUEUE_IDS)
-                val title = intent.getStringExtra(EXTRA_TITLE)
-                val artist = intent.getStringExtra(EXTRA_ARTIST)
-                if (!songId.isNullOrBlank()) {
+                val queueIds = intent.getStringArrayListExtra(EXTRA_QUEUE_IDS) ?: songId?.let { arrayListOf(it) }
+                val queueTitles = intent.getStringArrayListExtra(EXTRA_QUEUE_TITLES)
+                val queueArtists = intent.getStringArrayListExtra(EXTRA_QUEUE_ARTISTS)
+                if (!songId.isNullOrBlank() && queueIds != null) {
                     startForeground(NOTIFICATION_ID, createPlaceholderNotification())
                     serviceScope.launch {
-                        playSong(songId, queueIds ?: arrayListOf(songId), title, artist)
+                        playSong(
+                            songId,
+                            queueIds,
+                            queueTitles ?: arrayListOf(),
+                            queueArtists ?: arrayListOf()
+                        )
                     }
                 }
             }
@@ -374,26 +379,24 @@ class PlayerService : MediaLibraryService() {
     private suspend fun playSong(
         songId: String,
         queueIds: List<String>,
-        title: String? = null,
-        artist: String? = null
+        queueTitles: List<String>,
+        queueArtists: List<String>
     ) {
         val context = autoContext() ?: return
         val startIndex = queueIds.indexOf(songId).coerceAtLeast(0)
         val mediaItems = queueIds.mapIndexed { index, id ->
-            val builder = MediaItem.Builder()
+            MediaItem.Builder()
                 .setMediaId(id)
                 .setUri(streamUrl(id, context))
-            if (index == startIndex && (title != null || artist != null)) {
-                builder.setMediaMetadata(
+                .setMediaMetadata(
                     MediaMetadata.Builder()
-                        .setTitle(title ?: "")
-                        .setArtist(artist ?: "")
+                        .setTitle(queueTitles.getOrNull(index)?.takeIf { it.isNotEmpty() } ?: id)
+                        .setArtist(queueArtists.getOrNull(index) ?: "")
                         .setIsBrowsable(false)
                         .setIsPlayable(true)
                         .build()
                 )
-            }
-            builder.build()
+                .build()
         }
         player?.let { p ->
             p.setMediaItems(mediaItems, startIndex, 0L)
@@ -802,8 +805,8 @@ class PlayerService : MediaLibraryService() {
         const val ACTION_PLAY = "com.miyabi0619.subsonicclient.PLAY"
         const val EXTRA_SONG_ID = "song_id"
         const val EXTRA_QUEUE_IDS = "queue_ids"
-        const val EXTRA_TITLE = "title"
-        const val EXTRA_ARTIST = "artist"
+        const val EXTRA_QUEUE_TITLES = "queue_titles"
+        const val EXTRA_QUEUE_ARTISTS = "queue_artists"
         private const val CHANNEL_ID = "playback"
         private const val NOTIFICATION_ID = 1
         private const val SONG_METADATA_CACHE_PREFS = "song_metadata_cache"

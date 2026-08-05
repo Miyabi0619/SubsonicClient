@@ -100,14 +100,14 @@ class PlayerViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun play(songId: String, queueIds: List<String>, title: String? = null, artist: String? = null) {
+    fun play(songId: String, queue: List<QueueSongInfo>) {
         val context = getApplication<Application>().applicationContext
         val intent = Intent(context, PlayerService::class.java).apply {
             action = PlayerService.ACTION_PLAY
             putExtra(PlayerService.EXTRA_SONG_ID, songId)
-            putExtra(PlayerService.EXTRA_QUEUE_IDS, ArrayList(queueIds))
-            title?.let { putExtra(PlayerService.EXTRA_TITLE, it) }
-            artist?.let { putExtra(PlayerService.EXTRA_ARTIST, it) }
+            putExtra(PlayerService.EXTRA_QUEUE_IDS, ArrayList(queue.map { it.id }))
+            putExtra(PlayerService.EXTRA_QUEUE_TITLES, ArrayList(queue.map { it.title ?: "" }))
+            putExtra(PlayerService.EXTRA_QUEUE_ARTISTS, ArrayList(queue.map { it.artist ?: "" }))
         }
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             context.startForegroundService(intent)

@@ -28,11 +28,12 @@ import com.miyabi0619.subsonicclient.data.api.ArtistDto
 import com.miyabi0619.subsonicclient.data.api.PlaylistDto
 import com.miyabi0619.subsonicclient.data.api.SongDto
 import com.miyabi0619.subsonicclient.data.repository.LoginRepository
+import com.miyabi0619.subsonicclient.player.QueueSongInfo
 
 @Composable
 fun SearchScreen(
     loginRepository: LoginRepository,
-    onPlaySong: (songId: String, title: String?, artist: String?, queueIds: List<String>) -> Unit = { _, _, _, _ -> },
+    onPlaySong: (songId: String, queue: List<QueueSongInfo>) -> Unit = { _, _ -> },
     onAlbumClick: (albumId: String) -> Unit = {},
     onArtistClick: (artistId: String) -> Unit = {},
     onPlaylistClick: (playlistId: String) -> Unit = {},
@@ -98,7 +99,10 @@ fun SearchScreen(
                                 song = song,
                                 onClick = {
                                     val id = song.id ?: return@SearchSongItem
-                                    onPlaySong(id, song.title, song.artist, state.songs.mapNotNull { it.id })
+                                    onPlaySong(
+                                        id,
+                                        state.songs.mapNotNull { s -> s.id?.let { QueueSongInfo(it, s.title, s.artist) } }
+                                    )
                                 }
                             )
                         }

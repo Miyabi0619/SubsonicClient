@@ -41,6 +41,7 @@ import com.miyabi0619.subsonicclient.ui.search.SearchScreen
 import com.miyabi0619.subsonicclient.ui.settings.SettingsScreen
 import com.miyabi0619.subsonicclient.ui.theme.SubsonicClientTheme
 import com.miyabi0619.subsonicclient.player.PlayerViewModel
+import com.miyabi0619.subsonicclient.player.QueueSongInfo
 import com.miyabi0619.subsonicclient.ui.player.PlayerBar
 import com.miyabi0619.subsonicclient.ui.eq.EqScreen
 import com.miyabi0619.subsonicclient.ui.album.AlbumDetailScreen
@@ -108,8 +109,8 @@ fun MainScreen(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
-    val onPlaySong: (String, String?, String?, List<String>) -> Unit = { songId, title, artist, queueIds ->
-        playerViewModel.play(songId, queueIds, title, artist)
+    val onPlaySong: (String, List<QueueSongInfo>) -> Unit = { songId, queue ->
+        playerViewModel.play(songId, queue)
     }
 
     val isNowPlaying = currentDestination?.route == "nowplaying"

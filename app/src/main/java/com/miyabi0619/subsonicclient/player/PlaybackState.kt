@@ -1,5 +1,11 @@
 package com.miyabi0619.subsonicclient.player
 
+data class QueueSongInfo(
+    val id: String,
+    val title: String?,
+    val artist: String?
+)
+
 data class PlaybackState(
     val isPlaying: Boolean = false,
     val currentTitle: String? = null,

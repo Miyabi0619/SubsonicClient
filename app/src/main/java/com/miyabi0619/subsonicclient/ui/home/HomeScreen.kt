@@ -34,12 +34,13 @@ import com.miyabi0619.subsonicclient.data.api.ArtistDto
 import com.miyabi0619.subsonicclient.data.api.SongDto
 import com.miyabi0619.subsonicclient.data.api.SubsonicCoverArtUrlBuilder
 import com.miyabi0619.subsonicclient.data.repository.LoginRepository
+import com.miyabi0619.subsonicclient.player.QueueSongInfo
 import com.miyabi0619.subsonicclient.ui.common.CoverArtImage
 
 @Composable
 fun HomeScreen(
     loginRepository: LoginRepository,
-    onPlaySong: (songId: String, title: String?, artist: String?, queueIds: List<String>) -> Unit = { _, _, _, _ -> },
+    onPlaySong: (songId: String, queue: List<QueueSongInfo>) -> Unit = { _, _ -> },
     onAlbumClick: (albumId: String) -> Unit = {},
     viewModel: HomeViewModel = viewModel(
         factory = object : androidx.lifecycle.ViewModelProvider.Factory {
@@ -124,7 +125,10 @@ fun HomeScreen(
                                     coverArtUrl = buildCoverArtUrl(song.coverArt),
                                     onClick = {
                                         val id = song.id ?: return@SongCard
-                                        onPlaySong(id, song.title, song.artist, state.randomSongs.mapNotNull { it.id })
+                                        onPlaySong(
+                                            id,
+                                            state.randomSongs.mapNotNull { s -> s.id?.let { QueueSongInfo(it, s.title, s.artist) } }
+                                        )
                                     }
                                 )
                             }

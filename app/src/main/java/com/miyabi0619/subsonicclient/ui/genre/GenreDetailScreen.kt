@@ -34,6 +34,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.miyabi0619.subsonicclient.data.api.SongDto
 import com.miyabi0619.subsonicclient.data.api.SubsonicCoverArtUrlBuilder
 import com.miyabi0619.subsonicclient.data.repository.LoginRepository
+import com.miyabi0619.subsonicclient.player.QueueSongInfo
 import com.miyabi0619.subsonicclient.ui.common.CoverArtImage
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,7 +43,7 @@ fun GenreDetailScreen(
     genreName: String,
     loginRepository: LoginRepository,
     onBack: () -> Unit,
-    onPlaySong: (songId: String, title: String?, artist: String?, queueIds: List<String>) -> Unit,
+    onPlaySong: (songId: String, queue: List<QueueSongInfo>) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val viewModel: GenreDetailViewModel = viewModel(
@@ -113,7 +114,10 @@ fun GenreDetailScreen(
                                 coverArtUrl = buildCoverArtUrl(song.coverArt),
                                 onClick = {
                                     val id = song.id ?: return@SongRow
-                                    onPlaySong(id, song.title, song.artist, songs.mapNotNull { it.id })
+                                    onPlaySong(
+                                        id,
+                                        songs.mapNotNull { s -> s.id?.let { QueueSongInfo(it, s.title, s.artist) } }
+                                    )
                                 }
                             )
                         }
