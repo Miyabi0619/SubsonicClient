@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -20,15 +22,25 @@ android {
 
     signingConfigs {
         create("release") {
-            val keystoreFile = System.getenv("KEYSTORE_PATH")
-            val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
-            val keyAlias = System.getenv("KEY_ALIAS")
-            val keyPassword = System.getenv("KEY_PASSWORD")
-            if (keystoreFile != null && keystorePassword != null && keyAlias != null && keyPassword != null) {
-                storeFile = file(keystoreFile)
-                storePassword = keystorePassword
-                this.keyAlias = keyAlias
-                this.keyPassword = keyPassword
+            // CI (GitHub Actions) は環境変数 (KEYSTORE_PATH 等) を優先。
+            // ローカル開発では local.properties (git管理外) にフォールバックし、
+            // keystore.file が未指定なら keystore/MiyabiKS.jks を既定値として使う。
+            val localProps = Properties()
+            val localPropsFile = rootProject.file("local.properties")
+            if (localPropsFile.exists()) {
+                localPropsFile.inputStream().use { localProps.load(it) }
+            }
+
+            val keystorePath = System.getenv("KEYSTORE_PATH") ?: localProps.getProperty("keystore.file")
+            val keystoreFile = keystorePath?.let { file(it) } ?: rootProject.file("keystore/MiyabiKS.jks")
+
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: localProps.getProperty("keystore.password")
+                keyAlias = System.getenv("KEY_ALIAS") ?: localProps.getProperty("key.alias")
+                keyPassword = System.getenv("KEY_PASSWORD") ?: localProps.getProperty("key.password")
+            } else {
+                println("Release keystore not found at: ${keystoreFile.absolutePath}")
             }
         }
     }
